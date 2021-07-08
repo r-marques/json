@@ -1,8 +1,20 @@
 //! Serialize a Rust data structure into JSON data.
 
+#[cfg(not(feature = "std"))]
+use alloc::prelude::{String, ToString, Vec};
+#[cfg(not(feature = "std"))]
+use core::fmt;
+#[cfg(not(feature = "std"))]
+use core::num::FpCategory;
+#[cfg(not(feature = "std"))]
+use core::str;
+#[cfg(feature = "std")]
 use std::fmt;
+#[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "std")]
 use std::num::FpCategory;
+#[cfg(feature = "std")]
 use std::str;
 
 use super::error::{Error, ErrorCode, Result};
@@ -10,6 +22,16 @@ use serde::ser::{self, Impossible, Serialize};
 
 use itoa;
 use ryu;
+
+#[cfg(not(feature = "std"))]
+use core::fmt::Write as WriteTrait;
+#[cfg(feature = "std")]
+use std::io::Write as WriteTrait;
+
+#[cfg(feature = "std")]
+type IoResult = io::Result<()>;
+#[cfg(not(feature = "std"))]
+type IoResult = fmt::Result;
 
 /// A structure for serializing Rust values into JSON.
 pub struct Serializer<W, F = CompactFormatter> {
@@ -19,7 +41,7 @@ pub struct Serializer<W, F = CompactFormatter> {
 
 impl<W> Serializer<W>
 where
-    W: io::Write,
+    W: WriteTrait,
 {
     /// Creates a new JSON serializer.
     #[inline]
@@ -28,6 +50,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a, W> Serializer<W, PrettyFormatter<'a>>
 where
     W: io::Write,
@@ -41,7 +64,7 @@ where
 
 impl<W, F> Serializer<W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     /// Creates a new JSON visitor whose output will be written to the writer
@@ -63,7 +86,7 @@ where
 
 impl<'a, W, F> ser::Serializer for &'a mut Serializer<W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -460,17 +483,23 @@ where
     where
         T: fmt::Display,
     {
+        #[cfg(not(feature = "std"))]
+        use core::fmt::Write;
+        #[cfg(feature = "std")]
         use std::fmt::Write;
 
         struct Adapter<'ser, W: 'ser, F: 'ser> {
             writer: &'ser mut W,
             formatter: &'ser mut F,
+            #[cfg(feature = "std")]
             error: Option<io::Error>,
+            #[cfg(not(feature = "std"))]
+            error: Option<fmt::Error>,
         }
 
-        impl<'ser, W, F> Write for Adapter<'ser, W, F>
+        impl<'ser, W, F> fmt::Write for Adapter<'ser, W, F>
         where
-            W: io::Write,
+            W: WriteTrait,
             F: Formatter,
         {
             fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -534,7 +563,7 @@ pub enum Compound<'a, W: 'a, F: 'a> {
 
 impl<'a, W, F> ser::SerializeSeq for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -589,7 +618,7 @@ where
 
 impl<'a, W, F> ser::SerializeTuple for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -611,7 +640,7 @@ where
 
 impl<'a, W, F> ser::SerializeTupleStruct for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -633,7 +662,7 @@ where
 
 impl<'a, W, F> ser::SerializeTupleVariant for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -672,7 +701,7 @@ where
 
 impl<'a, W, F> ser::SerializeMap for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -754,7 +783,7 @@ where
 
 impl<'a, W, F> ser::SerializeStruct for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -805,7 +834,7 @@ where
 
 impl<'a, W, F> ser::SerializeStructVariant for Compound<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -852,11 +881,13 @@ struct MapKeySerializer<'a, W: 'a, F: 'a> {
     ser: &'a mut Serializer<W, F>,
 }
 
+#[cfg(feature = "std")]
 #[cfg(feature = "arbitrary_precision")]
 fn invalid_number() -> Error {
     Error::syntax(ErrorCode::InvalidNumber, 0, 0)
 }
 
+#[cfg(feature = "std")]
 #[cfg(feature = "raw_value")]
 fn invalid_raw_value() -> Error {
     Error::syntax(ErrorCode::ExpectedSomeValue, 0, 0)
@@ -868,7 +899,7 @@ fn key_must_be_a_string() -> Error {
 
 impl<'a, W, F> ser::Serializer for MapKeySerializer<'a, W, F>
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     type Ok = ();
@@ -1196,9 +1227,11 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(feature = "arbitrary_precision")]
 struct NumberStrEmitter<'a, W: 'a + io::Write, F: 'a + Formatter>(&'a mut Serializer<W, F>);
 
+#[cfg(feature = "std")]
 #[cfg(feature = "arbitrary_precision")]
 impl<'a, W: io::Write, F: Formatter> ser::Serializer for NumberStrEmitter<'a, W, F> {
     type Ok = ();
@@ -1381,9 +1414,11 @@ impl<'a, W: io::Write, F: Formatter> ser::Serializer for NumberStrEmitter<'a, W,
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(feature = "raw_value")]
 struct RawValueStrEmitter<'a, W: 'a + io::Write, F: 'a + Formatter>(&'a mut Serializer<W, F>);
 
+#[cfg(feature = "std")]
 #[cfg(feature = "raw_value")]
 impl<'a, W: io::Write, F: Formatter> ser::Serializer for RawValueStrEmitter<'a, W, F> {
     type Ok = ();
@@ -1608,6 +1643,7 @@ impl CharEscape {
 
 /// This trait abstracts away serializing the JSON control characters, which allows the user to
 /// optionally pretty print the JSON output.
+#[cfg(feature = "std")]
 pub trait Formatter {
     /// Writes a `null` value to the specified writer.
     #[inline]
@@ -1920,6 +1956,319 @@ pub trait Formatter {
         writer.write_all(fragment.as_bytes())
     }
 }
+///
+/// This trait abstracts away serializing the JSON control characters, which allows the user to
+/// optionally pretty print the JSON output.
+#[cfg(not(feature = "std"))]
+pub trait Formatter {
+    /// Writes a `null` value to the specified writer.
+    #[inline]
+    fn write_null<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("null")
+    }
+
+    /// Writes a `true` or `false` value to the specified writer.
+    #[inline]
+    fn write_bool<W: ?Sized>(&mut self, writer: &mut W, value: bool) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        let s = if value { "true" } else { "false" };
+        writer.write_str(s)
+    }
+
+    /// Writes an integer value like `-123` to the specified writer.
+    #[inline]
+    fn write_i8<W: ?Sized>(&mut self, writer: &mut W, value: i8) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `-123` to the specified writer.
+    #[inline]
+    fn write_i16<W: ?Sized>(&mut self, writer: &mut W, value: i16) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `-123` to the specified writer.
+    #[inline]
+    fn write_i32<W: ?Sized>(&mut self, writer: &mut W, value: i32) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `-123` to the specified writer.
+    #[inline]
+    fn write_i64<W: ?Sized>(&mut self, writer: &mut W, value: i64) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `123` to the specified writer.
+    #[inline]
+    fn write_u8<W: ?Sized>(&mut self, writer: &mut W, value: u8) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `123` to the specified writer.
+    #[inline]
+    fn write_u16<W: ?Sized>(&mut self, writer: &mut W, value: u16) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `123` to the specified writer.
+    #[inline]
+    fn write_u32<W: ?Sized>(&mut self, writer: &mut W, value: u32) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes an integer value like `123` to the specified writer.
+    #[inline]
+    fn write_u64<W: ?Sized>(&mut self, writer: &mut W, value: u64) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        itoa::fmt(writer, value).map(drop)
+    }
+
+    /// Writes a floating point value like `-31.26e+12` to the specified writer.
+    #[inline]
+    fn write_f32<W: ?Sized>(&mut self, writer: &mut W, value: f32) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        let mut buffer = ryu::Buffer::new();
+        let s = buffer.format(value);
+        writer.write_str(s)
+    }
+
+    /// Writes a floating point value like `-31.26e+12` to the specified writer.
+    #[inline]
+    fn write_f64<W: ?Sized>(&mut self, writer: &mut W, value: f64) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        let mut buffer = ryu::Buffer::new();
+        let s = buffer.format(value);
+        writer.write_str(s)
+    }
+
+    /// Writes a number that has already been rendered to a string.
+    #[inline]
+    fn write_number_str<W: ?Sized>(&mut self, writer: &mut W, value: &str) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str(value)
+    }
+
+    /// Called before each series of `write_string_fragment` and
+    /// `write_char_escape`.  Writes a `"` to the specified writer.
+    #[inline]
+    fn begin_string<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("\"")
+    }
+
+    /// Called after each series of `write_string_fragment` and
+    /// `write_char_escape`.  Writes a `"` to the specified writer.
+    #[inline]
+    fn end_string<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("\"")
+    }
+
+    /// Writes a string fragment that doesn't need any escaping to the
+    /// specified writer.
+    #[inline]
+    fn write_string_fragment<W: ?Sized>(&mut self, writer: &mut W, fragment: &str) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str(fragment)
+    }
+
+    /// Writes a character escape code to the specified writer.
+    #[inline]
+    fn write_char_escape<W: ?Sized>(
+        &mut self,
+        writer: &mut W,
+        char_escape: CharEscape,
+    ) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        use self::CharEscape::*;
+
+        let s = match char_escape {
+            Quote => "\\\"",
+            ReverseSolidus => "\\\\",
+            Solidus => "\\/",
+            Backspace => "\\b",
+            FormFeed => "\\f",
+            LineFeed => "\\n",
+            CarriageReturn => "\\r",
+            Tab => "\\t",
+            AsciiControl(byte) => {
+                static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
+                let bytes = &[
+                    b'\\',
+                    b'u',
+                    b'0',
+                    b'0',
+                    HEX_DIGITS[(byte >> 4) as usize],
+                    HEX_DIGITS[(byte & 0xF) as usize],
+                ];
+                let bytes = str::from_utf8(bytes).or(Err(fmt::Error))?;
+                return writer.write_str(bytes);
+            }
+        };
+
+        writer.write_str(s)
+    }
+
+    /// Called before every array.  Writes a `[` to the specified
+    /// writer.
+    #[inline]
+    fn begin_array<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("[")
+    }
+
+    /// Called after every array.  Writes a `]` to the specified
+    /// writer.
+    #[inline]
+    fn end_array<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("]")
+    }
+
+    /// Called before every array value.  Writes a `,` if needed to
+    /// the specified writer.
+    #[inline]
+    fn begin_array_value<W: ?Sized>(&mut self, writer: &mut W, first: bool) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        if first {
+            Ok(())
+        } else {
+            writer.write_str(",")
+        }
+    }
+
+    /// Called after every array value.
+    #[inline]
+    fn end_array_value<W: ?Sized>(&mut self, _writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        Ok(())
+    }
+
+    /// Called before every object.  Writes a `{` to the specified
+    /// writer.
+    #[inline]
+    fn begin_object<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("{")
+    }
+
+    /// Called after every object.  Writes a `}` to the specified
+    /// writer.
+    #[inline]
+    fn end_object<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str("}")
+    }
+
+    /// Called before every object key.
+    #[inline]
+    fn begin_object_key<W: ?Sized>(&mut self, writer: &mut W, first: bool) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        if first {
+            Ok(())
+        } else {
+            writer.write_str(",")
+        }
+    }
+
+    /// Called after every object key.  A `:` should be written to the
+    /// specified writer by either this method or
+    /// `begin_object_value`.
+    #[inline]
+    fn end_object_key<W: ?Sized>(&mut self, _writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        Ok(())
+    }
+
+    /// Called before every object value.  A `:` should be written to
+    /// the specified writer by either this method or
+    /// `end_object_key`.
+    #[inline]
+    fn begin_object_value<W: ?Sized>(&mut self, writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str(":")
+    }
+
+    /// Called after every object value.
+    #[inline]
+    fn end_object_value<W: ?Sized>(&mut self, _writer: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        Ok(())
+    }
+
+    /// Writes a raw JSON fragment that doesn't need any escaping to the
+    /// specified writer.
+    #[inline]
+    fn write_raw_fragment<W: ?Sized>(&mut self, writer: &mut W, fragment: &str) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        writer.write_str(fragment)
+    }
+}
 
 /// This structure compacts a JSON value with no extra whitespace.
 #[derive(Clone, Debug)]
@@ -1928,6 +2277,7 @@ pub struct CompactFormatter;
 impl Formatter for CompactFormatter {}
 
 /// This structure pretty prints a JSON value to make it human readable.
+#[cfg(feature = "std")]
 #[derive(Clone, Debug)]
 pub struct PrettyFormatter<'a> {
     current_indent: usize,
@@ -1935,6 +2285,7 @@ pub struct PrettyFormatter<'a> {
     indent: &'a [u8],
 }
 
+#[cfg(feature = "std")]
 impl<'a> PrettyFormatter<'a> {
     /// Construct a pretty printer formatter that defaults to using two spaces for indentation.
     pub fn new() -> Self {
@@ -1951,12 +2302,14 @@ impl<'a> PrettyFormatter<'a> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Default for PrettyFormatter<'a> {
     fn default() -> Self {
         PrettyFormatter::new()
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Formatter for PrettyFormatter<'a> {
     #[inline]
     fn begin_array<W: ?Sized>(&mut self, writer: &mut W) -> io::Result<()>
@@ -2066,9 +2419,9 @@ fn format_escaped_str<W: ?Sized, F: ?Sized>(
     writer: &mut W,
     formatter: &mut F,
     value: &str,
-) -> io::Result<()>
+) -> IoResult
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     try!(formatter.begin_string(writer));
@@ -2081,9 +2434,9 @@ fn format_escaped_str_contents<W: ?Sized, F: ?Sized>(
     writer: &mut W,
     formatter: &mut F,
     value: &str,
-) -> io::Result<()>
+) -> IoResult
 where
-    W: io::Write,
+    W: WriteTrait,
     F: Formatter,
 {
     let bytes = value.as_bytes();
@@ -2154,7 +2507,7 @@ static ESCAPE: [u8; 256] = [
 #[inline]
 pub fn to_writer<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
 where
-    W: io::Write,
+    W: WriteTrait,
     T: Serialize,
 {
     let mut ser = Serializer::new(writer);
@@ -2169,6 +2522,7 @@ where
 ///
 /// Serialization can fail if `T`'s implementation of `Serialize` decides to
 /// fail, or if `T` contains a map with non-string keys.
+#[cfg(feature = "std")]
 #[inline]
 pub fn to_writer_pretty<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
 where
@@ -2180,12 +2534,31 @@ where
     Ok(())
 }
 
+/// Serialize the given data structure as pretty-printed JSON into the IO
+/// stream.
+///
+/// # Errors
+///
+/// Serialization can fail if `T`'s implementation of `Serialize` decides to
+/// fail, or if `T` contains a map with non-string keys.
+// Currently no_std does not support to_writer_pretty. This is a workaround for types that
+// implement alternate `{:#?}`.
+#[cfg(not(feature = "std"))]
+pub fn to_writer_pretty<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
+where
+    W: WriteTrait,
+    T: Serialize,
+{
+    to_writer(writer, value)
+}
+
 /// Serialize the given data structure as a JSON byte vector.
 ///
 /// # Errors
 ///
 /// Serialization can fail if `T`'s implementation of `Serialize` decides to
 /// fail, or if `T` contains a map with non-string keys.
+#[cfg(feature = "std")]
 #[inline]
 pub fn to_vec<T: ?Sized>(value: &T) -> Result<Vec<u8>>
 where
@@ -2196,12 +2569,30 @@ where
     Ok(writer)
 }
 
+/// Serialize the given data structure as a JSON byte vector.
+///
+/// # Errors
+///
+/// Serialization can fail if `T`'s implementation of `Serialize` decides to
+/// fail, or if `T` contains a map with non-string keys.
+#[cfg(not(feature = "std"))]
+#[inline]
+pub fn to_vec<T: ?Sized>(value: &T) -> Result<Vec<u8>>
+where
+    T: Serialize,
+{
+    let mut writer = String::with_capacity(128);
+    try!(to_writer(&mut writer, value));
+    Ok(writer.into())
+}
+
 /// Serialize the given data structure as a pretty-printed JSON byte vector.
 ///
 /// # Errors
 ///
 /// Serialization can fail if `T`'s implementation of `Serialize` decides to
 /// fail, or if `T` contains a map with non-string keys.
+#[cfg(feature = "std")]
 #[inline]
 pub fn to_vec_pretty<T: ?Sized>(value: &T) -> Result<Vec<u8>>
 where
@@ -2237,6 +2628,7 @@ where
 ///
 /// Serialization can fail if `T`'s implementation of `Serialize` decides to
 /// fail, or if `T` contains a map with non-string keys.
+#[cfg(feature = "std")]
 #[inline]
 pub fn to_string_pretty<T: ?Sized>(value: &T) -> Result<String>
 where
@@ -2250,6 +2642,7 @@ where
     Ok(string)
 }
 
+#[cfg(feature = "std")]
 fn indent<W: ?Sized>(wr: &mut W, n: usize, s: &[u8]) -> io::Result<()>
 where
     W: io::Write,

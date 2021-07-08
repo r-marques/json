@@ -179,8 +179,7 @@
 //! # Constructing JSON values
 //!
 //! Serde JSON provides a [`json!` macro][macro] to build `serde_json::Value`
-//! objects with very natural JSON syntax. In order to use this macro,
-//! `serde_json` needs to be imported with the `#[macro_use]` attribute.
+//! objects with very natural JSON syntax.
 //!
 //! ```edition2018
 //! use serde_json::json;
@@ -294,7 +293,7 @@
 //! [macro]: https://docs.serde.rs/serde_json/macro.json.html
 //! [`serde-json-core`]: https://japaric.github.io/serde-json-core/serde_json_core/
 
-#![doc(html_root_url = "https://docs.rs/serde_json/1.0.37")]
+#![doc(html_root_url = "https://docs.rs/serde_json/1.0.39")]
 #![cfg_attr(feature = "cargo-clippy", allow(renamed_and_removed_lints))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy, clippy_pedantic))]
 // Ignored clippy lints
@@ -318,32 +317,46 @@
     redundant_field_names,
 ))]
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
 
 #[macro_use]
 extern crate serde;
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "preserve_order")]
 extern crate indexmap;
 extern crate itoa;
 extern crate ryu;
 
+#[cfg(feature = "std")]
 #[doc(inline)]
-pub use self::de::{from_reader, from_slice, from_str, Deserializer, StreamDeserializer};
+pub use self::de::from_reader;
+#[doc(inline)]
+pub use self::de::{from_slice, from_str, Deserializer, StreamDeserializer};
+#[cfg(feature = "std")]
 #[doc(inline)]
 pub use self::error::{Error, Result};
 #[doc(inline)]
-pub use self::ser::{
-    to_string, to_string_pretty, to_vec, to_vec_pretty, to_writer, to_writer_pretty, Serializer,
-};
+pub use self::ser::{to_string, to_vec, to_writer, Serializer};
+#[cfg(feature = "std")]
+#[doc(inline)]
+pub use self::ser::{to_string_pretty, to_vec_pretty, to_writer_pretty};
 #[doc(inline)]
 pub use self::value::{from_value, to_value, Map, Number, Value};
+
+#[cfg(not(feature = "std"))]
+use core::result;
+#[cfg(feature = "std")]
+use std::result;
 
 // We only use our own error type; no need for From conversions provided by the
 // standard library's try! macro. This reduces lines of LLVM IR by 4%.
 macro_rules! try {
     ($e:expr) => {
         match $e {
-            ::std::result::Result::Ok(val) => val,
-            ::std::result::Result::Err(err) => return ::std::result::Result::Err(err),
+            ::result::Result::Ok(val) => val,
+            ::result::Result::Err(err) => return ::result::Result::Err(err),
         }
     };
 }
@@ -357,9 +370,11 @@ pub mod map;
 pub mod ser;
 pub mod value;
 
+#[cfg(feature = "std")]
 mod iter;
 mod number;
 mod read;
 
+#[cfg(feature = "std")]
 #[cfg(feature = "raw_value")]
 mod raw;

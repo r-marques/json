@@ -1,6 +1,9 @@
+#[cfg(not(feature = "std"))]
+use core::fmt::{self, Debug, Display};
 use error::Error;
 use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+#[cfg(feature = "std")]
 use std::fmt::{self, Debug, Display};
 
 #[cfg(feature = "arbitrary_precision")]
@@ -473,7 +476,7 @@ macro_rules! deserialize_any {
             } else if let Some(i) = self.as_i64() {
                 return visitor.visit_i64(i);
             } else if let Some(f) = self.as_f64() {
-                if f.to_string() == self.n {
+                if ryu::Buffer::new().format(f) == self.n || f.to_string() == self.n {
                     return visitor.visit_f64(f);
                 }
             }

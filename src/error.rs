@@ -1,10 +1,26 @@
 //! When serializing or deserializing JSON goes wrong.
 
+#[cfg(not(feature = "std"))]
+use alloc::str::FromStr;
+#[cfg(not(feature = "std"))]
+use core::fmt::{self, Debug, Display};
+#[cfg(not(feature = "std"))]
+use core::result;
+#[cfg(feature = "std")]
 use std::error;
+#[cfg(feature = "std")]
 use std::fmt::{self, Debug, Display};
+#[cfg(feature = "std")]
 use std::io;
-use std::str::FromStr;
+#[cfg(feature = "std")]
 use std::result;
+#[cfg(feature = "std")]
+use std::str::FromStr;
+
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
 
 use serde::de;
 use serde::ser;
@@ -130,6 +146,7 @@ pub enum Category {
     Eof,
 }
 
+#[cfg(feature = "std")]
 #[cfg_attr(feature = "cargo-clippy", allow(fallible_impl_from))]
 impl From<Error> for io::Error {
     /// Convert a `serde_json::Error` into an `io::Error`.
@@ -185,7 +202,12 @@ pub enum ErrorCode {
     Message(Box<str>),
 
     /// Some IO error occurred while serializing or deserializing.
+    #[cfg(feature = "std")]
     Io(io::Error),
+
+    /// Some IO error occurred while serializing or deserializing.
+    #[cfg(not(feature = "std"))]
+    Io(fmt::Error),
 
     /// EOF while parsing a list.
     EofWhileParsingList,
@@ -271,9 +293,23 @@ impl Error {
     // Not public API. Should be pub(crate).
     //
     // Update `eager_json` crate when this function changes.
+    #[cfg(feature = "std")]
     #[doc(hidden)]
     #[cold]
     pub fn io(error: io::Error) -> Self {
+        Error {
+            err: Box::new(ErrorImpl {
+                code: ErrorCode::Io(error),
+                line: 0,
+                column: 0,
+            }),
+        }
+    }
+
+    #[cfg(not(feature = "std"))]
+    #[doc(hidden)]
+    #[cold]
+    pub fn io(error: fmt::Error) -> Self {
         Error {
             err: Box::new(ErrorImpl {
                 code: ErrorCode::Io(error),
@@ -333,6 +369,7 @@ impl Display for ErrorCode {
     }
 }
 
+#[cfg(feature = "std")]
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self.err.code {

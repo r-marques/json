@@ -3,8 +3,7 @@
 //! # Constructing JSON
 //!
 //! Serde JSON provides a [`json!` macro][macro] to build `serde_json::Value`
-//! objects with very natural JSON syntax. In order to use this macro,
-//! `serde_json` needs to be imported with the `#[macro_use]` attribute.
+//! objects with very natural JSON syntax.
 //!
 //! ```edition2018
 //! use serde_json::json;
@@ -93,9 +92,19 @@
 //! [from_slice]: https://docs.serde.rs/serde_json/de/fn.from_slice.html
 //! [from_reader]: https://docs.serde.rs/serde_json/de/fn.from_reader.html
 
+#[cfg(not(feature = "std"))]
+use core::fmt::{self, Debug};
+#[cfg(not(feature = "std"))]
+use core::mem;
+#[cfg(not(feature = "std"))]
+use core::str;
+#[cfg(feature = "std")]
 use std::fmt::{self, Debug};
+#[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "std")]
 use std::mem;
+#[cfg(feature = "std")]
 use std::str;
 
 use serde::de::DeserializeOwned;
@@ -111,6 +120,9 @@ pub use raw::RawValue;
 pub use self::index::Index;
 
 use self::ser::Serializer;
+
+#[cfg(not(feature = "std"))]
+use alloc::prelude::{String, Vec};
 
 /// Represents any valid JSON value.
 ///
@@ -195,6 +207,7 @@ struct WriterFormatter<'a, 'b: 'a> {
     inner: &'a mut fmt::Formatter<'b>,
 }
 
+#[cfg(feature = "std")]
 impl<'a, 'b> io::Write for WriterFormatter<'a, 'b> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         fn io_error<E>(_: E) -> io::Error {
@@ -208,6 +221,14 @@ impl<'a, 'b> io::Write for WriterFormatter<'a, 'b> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl<'a, 'b> fmt::Write for WriterFormatter<'a, 'b> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        try!(self.inner.write_str(s));
         Ok(())
     }
 }
@@ -931,28 +952,6 @@ mod ser;
 ///         "location": "Menlo Park, CA",
 ///     });
 ///
-///     let v = serde_json::to_value(u).unwrap();
-///     assert_eq!(v, expected);
-///
-///     Ok(())
-/// }
-/// #
-/// # fn main() {
-/// #     compare_json_values().unwrap();
-/// # }
-/// ```
-///
-/// # Errors
-///
-/// This conversion can fail if `T`'s implementation of `Serialize` decides to
-/// fail, or if `T` contains a map with non-string keys.
-///
-/// ```edition2018
-/// use std::collections::BTreeMap;
-///
-/// fn main() {
-///     // The keys in this map are vectors, not strings.
-///     let mut map = BTreeMap::new();
 ///     map.insert(vec![32, 64], "x86");
 ///
 ///     println!("{}", serde_json::to_value(map).unwrap_err());
